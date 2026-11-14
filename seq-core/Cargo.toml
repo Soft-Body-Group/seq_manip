@@ -1,0 +1,21 @@
+[package]
+name = "seq-core"
+version = "0.1.0"
+edition = "2021"
+description = "seq_manip's Rust, compiled from the live checkout unchanged, without Tauri, plus a session layer."
+publish = false
+
+# Same as the Tauri app, minus tauri and its plugins.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sequitur = { git = "https://github.com/Soft-Body-Group/sequitur.git", rev = "d09a43def095b1aa8283b277c727fb15d8f59179", features = ["serde", "trash"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff", "gif", "bmp", "webp"] }
+exr = "1.74"
+base64 = "0.22"
+dunce = "1"
+tauri = { path = "../tauri-shim", package = "tauri-shim" }
+tokio = { version = "1", features = ["macros", "sync"] }
+
+[target.'cfg(unix)'.dependencies]
+uzers = "0.12"
