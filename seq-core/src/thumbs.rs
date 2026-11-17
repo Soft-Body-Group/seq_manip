@@ -201,9 +201,8 @@ pub(crate) fn hidden_command(program: impl AsRef<std::ffi::OsStr>) -> std::proce
 
 /// Locates the ffmpeg sidecar: next to the app binary in a bundle (Tauri
 /// strips the target-triple suffix there), the triple-suffixed dev copy in
-/// the target dir or `src-tauri/binaries/`, then PATH. On Windows a fully
-/// self-contained single-exe build has no sidecar on disk, so as a final
-/// fallback the embedded copy is extracted to a cache dir (see `embedded`).
+/// the target dir or `binaries/`, then PATH. Nothing is embedded: with no
+/// ffmpeg found, thumbnails fall back to a glyph.
 pub(crate) fn ffmpeg_path() -> Option<PathBuf> {
     let exe = std::env::consts::EXE_SUFFIX; // ".exe" on Windows, "" elsewhere
     let triple_name = format!(
@@ -234,61 +233,11 @@ pub(crate) fn ffmpeg_path() -> Option<PathBuf> {
     if dev.is_file() {
         return Some(dev);
     }
-    let on_path = std::env::var_os("PATH").and_then(|paths| {
+    std::env::var_os("PATH").and_then(|paths| {
         std::env::split_paths(&paths)
             .map(|p| p.join(&plain))
             .find(|p| p.is_file())
-    });
-
-    #[cfg(windows)]
-    {
-        on_path.or_else(embedded::ffmpeg)
-    }
-    #[cfg(not(windows))]
-    {
-        on_path
-    }
-}
-
-/// Windows single-exe builds embed `ffmpeg.exe` (via `include_bytes!`) and
-/// unpack it once to `%LOCALAPPDATA%\seq_manip` on first use. The extracted
-/// file is named by the embedded byte length, so a new build lands beside the
-/// old one instead of racing to overwrite it.
-#[cfg(windows)]
-mod embedded {
-    use std::fs;
-    use std::path::PathBuf;
-
-    // Fetched by scripts/fetch_ffmpeg.mjs before the build; present only on
-    // Windows, hence the whole module is cfg-gated.
-    const FFMPEG: &[u8] = include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/binaries/ffmpeg-x86_64-pc-windows-msvc.exe"
-    ));
-
-    pub fn ffmpeg() -> Option<PathBuf> {
-        let base = std::env::var_os("LOCALAPPDATA")
-            .map(PathBuf::from)
-            .unwrap_or_else(std::env::temp_dir);
-        let dir = base.join("seq_manip");
-        let dst = dir.join(format!("ffmpeg-{}.exe", FFMPEG.len()));
-
-        // Already extracted at the right size → reuse.
-        if fs::metadata(&dst)
-            .map(|m| m.len() as usize == FFMPEG.len())
-            .unwrap_or(false)
-        {
-            return Some(dst);
-        }
-
-        fs::create_dir_all(&dir).ok()?;
-        // Write to a temp name then rename, so a concurrent launch never sees
-        // a half-written exe.
-        let tmp = dir.join(format!("ffmpeg-{}.part", std::process::id()));
-        fs::write(&tmp, FFMPEG).ok()?;
-        fs::rename(&tmp, &dst).ok()?;
-        Some(dst)
-    }
+    })
 }
 
 /// Extracts one frame via ffmpeg straight into `dst` (a PNG in the cache),
