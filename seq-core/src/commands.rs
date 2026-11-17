@@ -2130,15 +2130,24 @@ fn home_dir() -> Option<PathBuf> {
 /// a timeline clip). Errors if wobble edit isn't listening.
 #[tauri::command]
 pub fn send_to_wobble_edit(samples: Vec<String>) -> Result<usize, String> {
-    use std::io::Write as _;
     let sock = home_dir()
         .ok_or_else(|| "could not determine home directory".to_string())?
         .join("Library/Application Support/WobbleEdit/ingest.sock");
-    let mut conn = std::os::unix::net::UnixStream::connect(&sock)
-        .map_err(|_| "wobble edit isn't running (no ingest socket)".to_string())?;
-    for s in &samples {
-        let line = serde_json::json!({ "sample": s }).to_string() + "\n";
-        conn.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::io::Write as _;
+        let mut conn = std::os::unix::net::UnixStream::connect(&sock)
+            .map_err(|_| "wobble edit isn't running (no ingest socket)".to_string())?;
+        for s in &samples {
+            let line = serde_json::json!({ "sample": s }).to_string() + "\n";
+            conn.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
+        }
+        Ok(samples.len())
     }
-    Ok(samples.len())
+    // No Unix sockets: the ingest is not offered here.
+    #[cfg(not(unix))]
+    {
+        let _ = (sock, samples);
+        Err("sending to wobble edit needs a Unix socket (not on this platform)".to_string())
+    }
 }

@@ -2538,6 +2538,7 @@ dependencies = [
 [[package]]
 name = "sequitur"
 version = "0.2.0"
+source = "git+https://github.com/Soft-Body-Group/sequitur.git?rev=d09a43def095b1aa8283b277c727fb15d8f59179#d09a43def095b1aa8283b277c727fb15d8f59179"
 dependencies = [
  "serde",
  "thiserror 2.0.21",
